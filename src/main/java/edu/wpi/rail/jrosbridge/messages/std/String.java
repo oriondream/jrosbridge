@@ -1,5 +1,7 @@
 package edu.wpi.rail.jrosbridge.messages.std;
 
+import android.util.Log;
+
 import javax.json.Json;
 import javax.json.JsonObject;
 
@@ -72,6 +74,7 @@ public class String extends Message {
 	 */
 	public static String fromJsonString(java.lang.String jsonString) {
 		// convert to a message
+		Log.i("edu.wpi.rail.jrosbridge.Ros", jsonString);
 		return String.fromMessage(new Message(jsonString));
 	}
 

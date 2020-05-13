@@ -1,21 +1,34 @@
 package edu.wpi.rail.jrosbridge;
 
-import java.awt.image.Raster;
+import android.os.AsyncTask;
+import android.util.Log;
+
+//import java.awt.image.Raster;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.lang.reflect.Array;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import javax.imageio.ImageIO;
+//import javax.imageio.ImageIO;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.stream.JsonParsingException;
 import javax.websocket.ClientEndpoint;
+import javax.websocket.ClientEndpointConfig;
+import javax.websocket.CloseReason;
 import javax.websocket.ContainerProvider;
 import javax.websocket.DeploymentException;
+import javax.websocket.Endpoint;
+import javax.websocket.EndpointConfig;
+import javax.websocket.HandshakeResponse;
+import javax.websocket.MessageHandler;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
 import javax.websocket.OnMessage;
@@ -24,7 +37,10 @@ import javax.websocket.Session;
 
 import edu.wpi.rail.jrosbridge.callback.CallServiceCallback;
 import edu.wpi.rail.jrosbridge.services.ServiceRequest;
+
 import org.glassfish.grizzly.http.util.Base64Utils;
+import org.glassfish.tyrus.core.CloseReasons;
+import org.glassfish.tyrus.client.ClientManager;
 
 import edu.wpi.rail.jrosbridge.callback.ServiceCallback;
 import edu.wpi.rail.jrosbridge.callback.TopicCallback;
@@ -41,8 +57,73 @@ import edu.wpi.rail.jrosbridge.services.ServiceResponse;
  * @author Russell Toris - russell.toris@gmail.com
  * @version April 1, 2014
  */
-@ClientEndpoint
-public class Ros {
+@ClientEndpoint(
+//		decoders = SampleDecoder.class,
+//		encoders = SampleEncoder.class,
+//		subprotocols = {"subprtotocol1", "subprotocol2"},
+		configurator = Ros.ClientConfigurator.class)
+public class Ros extends Endpoint implements MessageHandler.Whole<String>
+{
+	@Override
+	public void onMessage(String message) {
+		try {
+			// parse the JSON
+			JsonObject jsonObject = Json
+					.createReader(new StringReader(message)).readObject();
+			// check for compression
+			String op = jsonObject.getString(JRosbridge.FIELD_OP);
+			if (op.equals(JRosbridge.OP_CODE_PNG)) {
+				Log.i(TAG, "JRosbridge.OP_CODE_PNG");
+				// TODO: VU: Not Android compatible
+				String data = jsonObject.getString(JRosbridge.FIELD_DATA);
+				// decompress the PNG data
+				byte[] bytes = Base64Utils.decode(data.getBytes());
+//				Raster imageData = ImageIO
+//						.read(new ByteArrayInputStream(bytes)).getRaster();
+//
+//				// read the RGB data
+//				int[] rawData = null;
+//				rawData = imageData.getPixels(0, 0, imageData.getWidth(),
+//						imageData.getHeight(), rawData);
+//				StringBuffer buffer = new StringBuffer();
+//				for (int i = 0; i < rawData.length; i++) {
+//					buffer.append(Character.toString((char) rawData[i]));
+//				}
+//
+//				// reparse the JSON
+//				JsonObject newJsonObject = Json.createReader(
+//						new StringReader(buffer.toString())).readObject();
+//				handleMessage(newJsonObject);
+			} else {
+				handleMessage(jsonObject);
+			}
+		}
+//		catch (IOException e) {
+//
+//		}
+		catch (NullPointerException e)
+		{
+			Log.e(TAG, "NullPointerException was caught when processing " + message);
+			Log.e(TAG, e.getStackTrace().toString());
+		}
+		catch (JsonParsingException e) {
+			Log.e(TAG, "JsonParsingException was caught when processing " + message);
+			Log.e(TAG, e.getStackTrace().toString());
+		}
+	}
+
+	public class ClientConfigurator extends ClientEndpointConfig.Configurator
+	{
+		public void beforeRequest(Map<String, List<String>> headers)
+		{
+			headers.put("origin", Arrays.asList("http://192.168.1.107:9090"));
+		}
+
+		public void afterResponse(HandshakeResponse hr) {
+			//process the handshake response
+		}
+	}
+	private static final String TAG = "edu.wpi.rail.jrosbridge.Ros";
 
 	/**
 	 * The default hostname used if none is provided.
@@ -197,19 +278,38 @@ public class Ros {
 	 * @return Returns true if the connection was established successfully and
 	 *         false otherwise.
 	 */
-	public boolean connect() {
-		try {
-			// create a WebSocket connection here
-			URI uri = new URI(this.getURL());
-			ContainerProvider.getWebSocketContainer()
-					.connectToServer(this, uri);
-			return true;
-		} catch (DeploymentException | URISyntaxException | IOException e) {
-			// failed connection, return false
-			System.err.println("[ERROR]: Could not create WebSocket: "
-					+ e.getMessage());
-			return false;
-		}
+	public void connect() {
+		final AsyncTask<Void, Void, Void> asyncTask = new AsyncTask<Void, Void, Void>() {
+			@Override
+			protected Void doInBackground(Void... voids) {
+				try {
+					final ClientManager client = ClientManager.createClient();
+					final ClientEndpointConfig.Builder configBuilder = ClientEndpointConfig.Builder.create();
+					configBuilder.configurator(new ClientConfigurator());
+					ClientEndpointConfig clientConfig = configBuilder.build();
+
+					Log.i("TYRUS-TEST", "### 1 AsyncTask.doInBackground");
+
+					client.connectToServer(Ros.this, clientConfig, URI.create("ws://192.168.1.107:9090/"));
+				}
+				catch (IOException e) {
+					// failed connection, return false
+					Log.e(TAG, "[ERROR]: Could not create WebSocket due to a IOException: "
+							+ e.getMessage());
+					Log.e(TAG, e.getStackTrace().toString());
+					return null;
+				}
+				catch (DeploymentException e) {
+					// failed connection, return false
+					Log.e(TAG, "[ERROR]: Could not create WebSocket due to a DeploymentException: "
+							+ e.getMessage());
+					Log.e(TAG, e.getStackTrace().toString());
+					return null;
+				}
+				return null;
+			}
+		};
+		asyncTask.execute();
 	}
 
 	/**
@@ -225,7 +325,7 @@ public class Ros {
 				this.session.close();
 				return true;
 			} catch (IOException e) {
-				System.err.println("[ERROR]: Could not disconnect: "
+				Log.e(TAG,"[ERROR]: Could not disconnect: "
 						+ e.getMessage());
 			}
 		}
@@ -248,25 +348,31 @@ public class Ros {
 	 * @param session
 	 *            The session associated with the connection.
 	 */
-	@OnOpen
-	public void onOpen(Session session) {
+	@Override
+	public void onOpen(Session session, EndpointConfig EndpointConfig)
+	{
 		// store the session
 		this.session = session;
+
+		session.addMessageHandler(this);
 
 		// call the handlers
 		for (RosHandler handler : this.handlers) {
 			handler.handleConnection(session);
 		}
+
+		Log.i(TAG, "Successfully open websocket " + getURL().toString());
 	}
 
 	/**
 	 * This function is called once a successful disconnection is made.
-	 * 
+	 *
 	 * @param session
 	 *            The session associated with the disconnection.
 	 */
 	@OnClose
-	public void onClose(Session session) {
+	public void onClose(Session session, CloseReason closeReason)
+	{
 		// remove the session
 		this.session = null;
 
@@ -275,7 +381,6 @@ public class Ros {
 			handler.handleDisconnection(session);
 		}
 	}
-
 	/**
 	 * This function is called if an error occurs.
 	 * 
@@ -301,8 +406,9 @@ public class Ros {
 	 *            The incoming JSON message from rosbridge.
 	 */
 	@OnMessage
-	public void onMessage(String message) {
+	public void onMessage(Session session, String message) {
 		try {
+			Log.i(TAG, "json message received");
 			// parse the JSON
 			JsonObject jsonObject = Json
 					.createReader(new StringReader(message)).readObject();
@@ -310,31 +416,34 @@ public class Ros {
 			// check for compression
 			String op = jsonObject.getString(JRosbridge.FIELD_OP);
 			if (op.equals(JRosbridge.OP_CODE_PNG)) {
+				// TODO: VU: Not Android compatible
 				String data = jsonObject.getString(JRosbridge.FIELD_DATA);
 				// decompress the PNG data
 				byte[] bytes = Base64Utils.decode(data.getBytes());
-				Raster imageData = ImageIO
-						.read(new ByteArrayInputStream(bytes)).getRaster();
-
-				// read the RGB data
-				int[] rawData = null;
-				rawData = imageData.getPixels(0, 0, imageData.getWidth(),
-						imageData.getHeight(), rawData);
-				StringBuffer buffer = new StringBuffer();
-				for (int i = 0; i < rawData.length; i++) {
-					buffer.append(Character.toString((char) rawData[i]));
-				}
-
-				// reparse the JSON
-				JsonObject newJsonObject = Json.createReader(
-						new StringReader(buffer.toString())).readObject();
-				handleMessage(newJsonObject);
+//				Raster imageData = ImageIO
+//						.read(new ByteArrayInputStream(bytes)).getRaster();
+//
+//				// read the RGB data
+//				int[] rawData = null;
+//				rawData = imageData.getPixels(0, 0, imageData.getWidth(),
+//						imageData.getHeight(), rawData);
+//				StringBuffer buffer = new StringBuffer();
+//				for (int i = 0; i < rawData.length; i++) {
+//					buffer.append(Character.toString((char) rawData[i]));
+//				}
+//
+//				// reparse the JSON
+//				JsonObject newJsonObject = Json.createReader(
+//						new StringReader(buffer.toString())).readObject();
+//				handleMessage(newJsonObject);
 			} else {
 				handleMessage(jsonObject);
 			}
-		} catch (NullPointerException | IOException | JsonParsingException e) {
+		} catch (NullPointerException
+//				| IOException
+				| JsonParsingException e) {
 			// only occurs if there was an error with the JSON
-			System.err.println("[WARN]: Invalid incoming rosbridge protocol: "
+			Log.e(TAG,"[WARN]: Invalid incoming rosbridge protocol: "
 					+ message);
 		}
 	}
@@ -352,14 +461,19 @@ public class Ros {
 		if (op.equals(JRosbridge.OP_CODE_PUBLISH)) {
 			// check for the topic name
 			String topic = jsonObject.getString(JRosbridge.FIELD_TOPIC);
-
 			// call each callback with the message
 			ArrayList<TopicCallback> callbacks = topicCallbacks.get(topic);
 			if (callbacks != null) {
 				Message msg = new Message(
 						jsonObject.getJsonObject(JRosbridge.FIELD_MESSAGE));
 				for (TopicCallback cb : callbacks) {
-					cb.handleMessage(msg);
+					try {
+						cb.handleMessage(msg);
+					}
+					catch (NullPointerException e)
+					{
+						Log.e(TAG, "NullPointerException caught when trying to handle incoming message: " + e.getMessage());
+					}
 				}
 			}
 		} else if (op.equals(JRosbridge.OP_CODE_SERVICE_RESPONSE)) {
@@ -395,7 +509,7 @@ public class Ros {
 				cb.handleServiceCall(request);
 			}
 		} else {
-			System.err.println("[WARN]: Unrecognized op code: "
+			Log.e(TAG,"[WARN]: Unrecognized op code: "
 					+ jsonObject.toString());
 		}
 
@@ -416,9 +530,13 @@ public class Ros {
 				this.session.getBasicRemote().sendText(jsonObject.toString());
 				return true;
 			} catch (IOException e) {
-				System.err.println("[ERROR]: Could not send message: "
+				Log.e(TAG,"[ERROR]: Could not send message: "
 						+ e.getMessage());
 			}
+		}
+		else
+		{
+			Log.w(TAG, "Connection to rosbridge lost");
 		}
 		// message send failed
 		return false;

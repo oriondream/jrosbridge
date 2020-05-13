@@ -266,7 +266,7 @@ public class Topic {
 	 * @param message
 	 *            The message to publish.
 	 */
-	public void publish(Message message) {
+	public boolean publish(Message message) {
 		// check if we have advertised yet.
 		if (!this.isAdvertised()) {
 			this.advertise();
@@ -279,6 +279,7 @@ public class Topic {
 				.add(JRosbridge.FIELD_ID, publishId)
 				.add(JRosbridge.FIELD_TOPIC, this.name)
 				.add(JRosbridge.FIELD_MESSAGE, message.toJsonObject()).build();
-		this.ros.send(call);
+
+		return this.ros.send(call);
 	}
 }

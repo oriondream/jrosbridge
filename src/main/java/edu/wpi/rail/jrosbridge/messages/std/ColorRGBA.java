@@ -1,6 +1,6 @@
 package edu.wpi.rail.jrosbridge.messages.std;
 
-import java.awt.Color;
+//import java.awt.Color;
 
 import javax.json.Json;
 import javax.json.JsonObject;
@@ -127,9 +127,9 @@ public class ColorRGBA extends Message {
 	 * 
 	 * @return A new Java color object based on this message.
 	 */
-	public Color toColor() {
-		return new Color(this.r, this.g, this.b, this.a);
-	}
+//	public Color toColor() {
+//		return new Color(this.r, this.g, this.b, this.a);
+//	}
 
 	/**
 	 * Create a clone of this ColorRGBA.
@@ -147,13 +147,13 @@ public class ColorRGBA extends Message {
 	 *            The Java Color object containing the color information.
 	 * @return A new ColorRGBA message based on the given color information.
 	 */
-	public static ColorRGBA fromColor(Color c) {
-		float r = (float) c.getRed() / 255.0f;
-		float g = (float) c.getGreen() / 255.0f;
-		float b = (float) c.getBlue() / 255.0f;
-		float a = (float) c.getAlpha() / 255.0f;
-		return new ColorRGBA(r, g, b, a);
-	}
+//	public static ColorRGBA fromColor(Color c) {
+//		float r = (float) c.getRed() / 255.0f;
+//		float g = (float) c.getGreen() / 255.0f;
+//		float b = (float) c.getBlue() / 255.0f;
+//		float a = (float) c.getAlpha() / 255.0f;
+//		return new ColorRGBA(r, g, b, a);
+//	}
 
 	/**
 	 * Create a new ColorRGBA based on the given JSON string. Any missing values

@@ -64,6 +64,8 @@ import edu.wpi.rail.jrosbridge.services.ServiceResponse;
 		configurator = Ros.ClientConfigurator.class)
 public class Ros extends Endpoint implements MessageHandler.Whole<String>
 {
+	private static final String TAG = "edu.wpi.rail.jrosbridge";
+
 	@Override
 	public void onMessage(String message) {
 		try {
@@ -116,19 +118,18 @@ public class Ros extends Endpoint implements MessageHandler.Whole<String>
 	{
 		public void beforeRequest(Map<String, List<String>> headers)
 		{
-			headers.put("origin", Arrays.asList("http://192.168.1.107:9090"));
+			headers.put("origin", Arrays.asList("http://192.168.43.59:9090"));
 		}
 
 		public void afterResponse(HandshakeResponse hr) {
 			//process the handshake response
 		}
 	}
-	private static final String TAG = "edu.wpi.rail.jrosbridge.Ros";
 
 	/**
 	 * The default hostname used if none is provided.
 	 */
-	public static final String DEFAULT_HOSTNAME = "localhost";
+	public static final String DEFAULT_HOSTNAME = "192.168.43.59";
 
 	/**
 	 * The default port used if none is provided.
@@ -288,9 +289,9 @@ public class Ros extends Endpoint implements MessageHandler.Whole<String>
 					configBuilder.configurator(new ClientConfigurator());
 					ClientEndpointConfig clientConfig = configBuilder.build();
 
-					Log.i("TYRUS-TEST", "### 1 AsyncTask.doInBackground");
+					Log.i(TAG, "### 1 AsyncTask.doInBackground");
 
-					client.connectToServer(Ros.this, clientConfig, URI.create("ws://192.168.1.107:9090/"));
+					client.connectToServer(Ros.this, clientConfig, URI.create("ws://192.168.43.59:9090/"));
 				}
 				catch (IOException e) {
 					// failed connection, return false
@@ -562,6 +563,7 @@ public class Ros extends Endpoint implements MessageHandler.Whole<String>
 	 */
 	public void authenticate(String mac, String client, String dest,
 			String rand, int t, String level, int end) {
+		Log.i(TAG,"authenticating...");
 		// build and send the rosbridge call
 		JsonObject call = Json.createObjectBuilder()
 				.add(JRosbridge.FIELD_OP, JRosbridge.OP_CODE_AUTH)
